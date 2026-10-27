@@ -9,7 +9,8 @@ SVC=/etc/systemd/system/ventozy.service
 
 # ---------- 1. código en /opt ----------
 mkdir -p "$DST"
-cp -r "$SRC"/ventozy "$SRC"/run.py "$SRC"/README.md "$DST"/ 2>/dev/null || true
+cp -r "$SRC"/ventozy "$SRC"/configs "$SRC"/system "$SRC"/assets \
+      "$SRC"/run.py "$SRC"/README.md "$DST"/
 chmod -R a+rX "$DST"
 
 # ---------- 2. dependencias ----------
@@ -54,7 +55,7 @@ cat > /usr/share/applications/ventozy.desktop <<EOF
 [Desktop Entry]
 Name=Ventozy
 Comment=Control de ventiladores y GPU (estilo G-Helper)
-Exec=pkexec python3 $DST/run.py
+Exec=/usr/local/bin/ventozy
 Icon=/usr/share/icons/hicolor/128x128/apps/ventozy-icon.png
 Type=Application
 Categories=Utility;System;
@@ -62,8 +63,10 @@ StartupNotify=true
 EOF
 
 # ---------- 6. ejecutables en PATH ----------
-# política pkexec: Ventozy es de confianza y sin password (como G-Helper pide
-# admin solo la primera vez). Elimina el archivo para volver a pedir pass.
+# política pkexec: exec.path/argv1 hacen que ESTA política aplique a
+# 'pkexec python3 /opt/ventozy/run.py' (sin annotation, polkit usa la
+# política por defecto de python3). auth_admin_keep pide contraseña la
+# primera vez y la recuerda 5 min (como el UAC de Windows).
 cat > /usr/share/polkit-1/actions/com.ventozy.policy <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
@@ -72,6 +75,8 @@ cat > /usr/share/polkit-1/actions/com.ventozy.policy <<'EOF'
  <action id="com.ventozy.modify">
   <description>Control de ventiladores/GPU/teclado de Ventozy</description>
   <message>Se necesita permiso para controlar el hardware</message>
+  <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/python3</annotate>
+  <annotate key="org.freedesktop.policykit.exec.argv1">/opt/ventozy/run.py</annotate>
   <defaults>
    <allow_any>auth_admin_keep</allow_any>
    <allow_inactive>auth_admin_keep</allow_inactive>
@@ -80,11 +85,25 @@ cat > /usr/share/polkit-1/actions/com.ventozy.policy <<'EOF'
  </action>
 </policyconfig>
 EOF
-# `ventozy` → GUI con icono y botones (permisos via pkexec, como G-Helper)
+# `ventozy` → GUI con icono y botones (permisos via pkexec, como G-Helper).
+# pkexec pierde HOME/DISPLAY/XAUTHORITY: se pasan explícitamente para que
+# las curvas persistan en ~/.config/ventozy y Tk pueda abrir la ventana.
 cat > /usr/local/bin/ventozy <<EOF
 #!/bin/bash
-exec pkexec python3 $DST/run.py "\$@"
+if [ "\$(id -u)" -eq 0 ]; then
+    exec python3 $DST/run.py "\$@"
+fi
+exec pkexec env \\
+    DISPLAY="\${DISPLAY:-:0}" \\
+    XAUTHORITY="\${XAUTHORITY:-\$HOME/.Xauthority}" \\
+    HOME="\$HOME" \\
+    python3 $DST/run.py "\$@"
 EOF
 chmod +x /usr/local/bin/ventozy
-# `ventozy-gui` → solo GUI sin pedir permisos (no-crítico, para mirar estado)
-ln -sf /usr/local/bin/ventozy /usr/local/bin/ventozy-gui
+# `ventozy-gui` → GUI como USUARIO normal, sin pkexec ni contraseña
+# (lecturas de estado funcionan; las escrituras elevan con `ventozy`).
+cat > /usr/local/bin/ventozy-gui <<EOF
+#!/bin/bash
+exec python3 $DST/run.py "\$@"
+EOF
+chmod +x /usr/local/bin/ventozy-gui

@@ -12,14 +12,17 @@
   python3 run.py hotkeys         → atajos: Fn+F5 modo fans · Fn+↑/↓ brillo teclado
   python3 run.py tray            → icono en el panel (Cinnamon/MATE/GNOME)
   python3 run.py adaptive 75     → modo adaptativo (menos ruido)
-  python3 run.py import-nbfc --list "asus"        → catálogo de configs convalidadas nbfc-linux
+  python3 run.py import-nbfc --list "asus"        → catálogo de configs validadas nbfc-linux
   python3 run.py import-nbfc --install "ASUS/TUF Gaming FA506NC.json"
                                                   → importa a configs/ (soporta tu modelo)
   python3 run.py list            → equipos soportados
 """
 
 import os
+import shutil
+import subprocess
 import sys
+import urllib.error
 
 from ventozy.devices import detect
 
@@ -76,13 +79,12 @@ def doctor(device=None) -> int:
 
     # 4. estado del daemon systemd
     try:
-        import subprocess
         r = subprocess.run(["systemctl", "is-active", "ventozy"],
                            capture_output=True, text=True)
-        active = r.stdout.strip() == "active"
-        add(f"Servicio systemd ventozy: {r.stdout.strip()}", True)
-        if not active:
-            print("   (✓ instalable con: sudo python3 run.py install)")
+        state = r.stdout.strip() or "unknown"
+        active = state == "active"
+        add(f"Servicio systemd ventozy: {state}", active,
+            "sudo python3 run.py install")
     except OSError:
         pass
 
@@ -102,7 +104,12 @@ def doctor(device=None) -> int:
 
 
 def _probe_write(fan):
-    """Test de escritura NO destructivo: escribe el valor actual leído."""
+    """Test de escritura NO destructivo: escribe el valor actual leído.
+
+    Nota: escribir pwm? sin tocar pwm?_enable puede, en drivers raros,
+    cambiar el modo del ventilador. Si el daemon está activo puede haber
+    una carrera benigna (el daemon re-escribe su PWM al siguiente tick);
+    ejecútalo preferiblemente con el daemon parado."""
     cur = fan.read()
     if cur is None:
         return False
@@ -147,18 +154,36 @@ def install_systemd() -> int:
     dst = "/opt/ventozy"
     if os.path.abspath(__file__) != os.path.join(dst, "run.py"):
         print(f"Copiando código a {dst} ...")
-        ret = os.system(f'mkdir -p "{dst}" && cp -r "{src}"/* "{dst}"/')
-        if ret != 0:
-            print("❌ error copiando código")
+        try:
+            os.makedirs(dst, exist_ok=True)
+            for item in ("ventozy", "configs", "system", "assets"):
+                s = os.path.join(src, item)
+                if os.path.isdir(s):
+                    shutil.copytree(s, os.path.join(dst, item),
+                                    dirs_exist_ok=True)
+            for f in ("run.py", "README.md"):
+                if os.path.isfile(os.path.join(src, f)):
+                    shutil.copy(os.path.join(src, f), dst)
+        except (OSError, shutil.Error) as e:
+            print(f"❌ error copiando código: {e}")
             return 1
-    os.system(f"chmod -R a+rX {dst}")
+    try:
+        os.chmod(dst, 0o755)
+        for root, dirs, files in os.walk(dst):
+            for d in dirs:
+                os.chmod(os.path.join(root, d), 0o755)
+            for fn in files:
+                os.chmod(os.path.join(root, fn), 0o644)
+    except OSError:
+        pass
     svc = os.path.join(src, "system", "ventozy.service")
-    target = f"/etc/systemd/system/ventozy.service"
-    if os.path.isfile(svc):
-        os.system(f'cp "{svc}" "{target}"')
-    else:  # fallback: Servicio mínimo embebido
-        with open(target, "w") as f:
-            f.write(f"""[Unit]
+    target = "/etc/systemd/system/ventozy.service"
+    try:
+        if os.path.isfile(svc):
+            shutil.copy(svc, target)
+        else:  # fallback: servicio mínimo embebido
+            with open(target, "w") as f:
+                f.write(f"""[Unit]
 Description=Ventozy — control seguro de ventiladores
 After=multi-user.target
 
@@ -177,6 +202,9 @@ User=root
 [Install]
 WantedBy=multi-user.target
 """)
+    except OSError as e:
+        print(f"❌ error instalando servicio: {e}")
+        return 1
     for c in ("systemctl daemon-reload", "systemctl enable --now ventozy"):
         if os.system(c) != 0:
             print("❌ falló:", c)
@@ -204,7 +232,8 @@ def main() -> int:
     cmd, *rest = sys.argv[1:]
 
     if cmd == "doctor":
-        return doctor(device)
+        doctor()          # doctor() ya hace device = device or detect()
+        return 0
 
     if cmd == "gpu":
         return gpu_cmd(rest[0] if rest else "state")
@@ -271,12 +300,12 @@ def main() -> int:
 
     if cmd == "tray":
         from ventozy.providers.tray import run as tray_run
-        return tray_run(device)
+        return tray_run(detect())
 
     if cmd == "adaptive":
         from ventozy.providers.adaptive import AdaptiveController
         target = float(rest[0]) if rest else 75.0
-        AdaptiveController(device, target=target).run_forever()
+        AdaptiveController(detect(), target=target).run_forever()
         return 0
 
     if cmd == "hotkeys":

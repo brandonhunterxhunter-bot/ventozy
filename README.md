@@ -74,10 +74,11 @@ El .deb (dpkg oficial) instala:
   (nítido a cualquier resolución en Cinnamon: panel, dock, Alt-Tab)
 - `/opt/ventozy` — código completo con assets
 - `/lib/systemd/system/ventozy.service` + `ventozy-hotkeys.service` — autostart
-  (daemon seguro al arranque + Fn+F5/Fn+↑/↓), enbailed en `postinst`
+  (daemon seguro al arranque + Fn+F5/Fn+↑/↓), habilitados en `postinst`
 - política polkit `com.ventozy.modify` (password con memoria de 5 min)
 
-**Desinstalación con reversión total**: `sudo apt remove ventozy` —
+**Desinstalación con reversión total**: `sudo apt remove ventozy`, que detiene
+los servicios y borra todo lo instalado (prerm + postrm incluidos).
 
 ## Independencia de sensores (tiempo real)
 
@@ -85,7 +86,7 @@ El núcleo ya NO depende de que exista un driver concreto (`k10temp`,
 `coretemp`, `zenpower`, `asus_ec`, `it87`...). `core/sensors.py` es un
 **hub universal** que agrega en tiempo real todas las fuentes que haya:
 - **hwmon** (la estándar del kernel): con `tempX_label` si el driver la da;
-  si no, aplica heurística amilla (chip + palabra clave CPU/GPU).
+  si no, aplica heurística amigable (chip + palabra clave CPU/GPU).
 - **`nvidia-smi`** para la GPU dedicada (independiente de si el driver
   publica hwmon o no — importante en NVIDIA).
 - **`psutil`** si está instalado (opcional).
@@ -133,12 +134,12 @@ Véase `devices/asus_tuf_fa506nc.py` de ejemplo.
 
 - Instalado y activado por `install.sh` (servicio `ventozy-hotkeys`, 40 MB cap,
   se auto-levanta en el arranque).
-- Requiere `python3-evdev` (lo instala el script). El demostración: la GUI
+- Requiere `python3-evdev` (lo instala el script). Por ejemplo: la GUI
   también tiene los botones de brillo y la paleta de colores.
 
 ## Colores de la retroiluminación del teclado 🎨
 
-Interruptor brillo: botones `Brillo ±` en la GUI (LED `/sys/class/leds/asus::kbd_backlight`).
+Brillo del teclado: botones `Brillo ±` en la GUI (LED `/sys/class/leds/asus::kbd_backlight`).
 Colores: paleta de 9 colores predefinidos + campo **color propio** (hex, p. ej.
 `#2b7cd3`). Por debajo usa `asusctl` (proyecto oficial asus-linux.org) — el
 FA506NC tiene RGB Single-Zone del firmware con modos estático/etc.
@@ -149,7 +150,7 @@ Sin asusctl la GUI avisa: "instala asusctl". Estilo todo reversible.
 | G-Helper (Windows) | Ventozy (Linux / Mint) | Funciona |
 |---|---|---|
 | Modos fan Silent/Balanced/Turbo | 🔇/⚖️/🚀 + Auto, curvas editables, both fans con reintentos | ✅ |
-| Power mode Whisper/Standard/Boost | governor + EPP + boost (providers/power.py),cripts en botones | ✅ |
+| Power mode Whisper/Standard/Boost | governor + EPP + boost (providers/power.py), botones dedicados | ✅ |
 | Auto-switch fans en batería/cargador | AutoSwitchDaemon: AC→balanced, batería→quiet + whisper power | ✅ |
 | GPU switch (iGPU/dGPU) | runtime PM reversible (providers/gpu.py) | ✅ |
 | Keyboard backlight + RGB | brillo sysfs + paleta + hex custom vía asusctl | ✅ |
@@ -166,11 +167,19 @@ Sin asusctl la GUI avisa: "instala asusctl". Estilo todo reversible.
   "Notifications" o "Power modules", o crear keyboard shortcuts en
   Config → Keyboard → Shortcut (comando `ventozy status`) si prefieres
   delegar en el DE en lugar del daemon evdev.
-- La política pkexec creada por install.sh pide la contraseña con memoria
-  (5 min) — como G-Helper muestia UAC solo la primera vez.
+- La política pkexec creada por install.sh pide la contraseña de admin
+  (con `auth_admin_keep`: se recuerda 5 min, como el UAC de Windows que
+  G-Helper solo muestra la primera vez). La política lleva los `annotate`
+  `exec.path`/`argv1` necesarios para que aplique a `pkexec python3
+  /opt/ventozy/run.py`.
+- `ventozy-gui` corre la GUI como tu usuario (sin pkexec): ideal para
+  mirar estado; si escribes curvas sin permisos, la GUI te dirá cómo
+  elevar (`ventozy` sí eleva). pkexec pierde `HOME`/`DISPLAY`, por eso
+  el lanzador los pasa explícitos: tus curvas persisten en TU
+  `~/.config/ventozy/`, no en el de root.
 - amd_pstate: usa kernel ≥ 6.1 de Mint para máximo control (governors).
 
-## Bepping extra: notificaciones, bandeja y modo adaptativo
+## Extras: notificaciones, bandeja y modo adaptativo
 
 - **Notificaciones de escritorio** (`notify-send`): al cambiar de modo con
   Fn+F5 o la GUI aparece un toast "Ventiladores → Turbo"; ante una

@@ -41,14 +41,18 @@ chmod -R a+rX "$WORK/opt/ventozy"
 
 # ---------- ejecutable ----------
 cat > "$WORK/usr/bin/ventozy" <<'EOF'
-#!/usr/bin/env python3
-import importlib.util, sys
-run = "/opt/ventozy/run.py"
-spec = importlib.util.spec_from_file_location("ventozy_run", run)
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
-sys.argv[0] = "ventozy"
-sys.exit(mod.main())
+#!/bin/bash
+# como root ya (sudo/systemd): ejecuta directo
+if [ "$(id -u)" -eq 0 ]; then
+    exec python3 /opt/ventozy/run.py "$@"
+fi
+# usuario normal: eleva con pkexec; conserva HOME (persistencia de curvas
+# en ~/.config/ventozy) y DISPLAY/XAUTHORITY (que Tk abra la ventana)
+exec pkexec env \
+    DISPLAY="${DISPLAY:-:0}" \
+    XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}" \
+    HOME="$HOME" \
+    python3 /opt/ventozy/run.py "$@"
 EOF
 chmod 755 "$WORK/usr/bin/ventozy"
 
@@ -89,6 +93,8 @@ cat > "$WORK/usr/share/polkit-1/actions/com.ventozy.policy" <<'EOF'
  <action id="com.ventozy.modify">
   <description>Controlar ventiladores/GPU/teclado con Ventozy</description>
   <message>Ventozy necesita permiso para controlar el hardware</message>
+  <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/python3</annotate>
+  <annotate key="org.freedesktop.policykit.exec.argv1">/opt/ventozy/run.py</annotate>
   <defaults>
    <allow_any>auth_admin_keep</allow_any>
    <allow_inactive>auth_admin_keep</allow_inactive>
