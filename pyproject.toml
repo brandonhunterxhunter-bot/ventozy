@@ -1,4 +1,4 @@
-﻿[build-system]
+[build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
@@ -20,8 +20,14 @@ classifiers = [
 [project.scripts]
 ventozy = "ventozy.cli:main"
 
+[tool.setuptools]
+py-modules = ["run"]   # run.py se instala como módulo (entry point lo usa)
+
 [tool.setuptools.packages.find]
 include = ["ventozy*"]
+
+[tool.setuptools.data-files]
+"share/ventozy/configs" = ["configs/*.json"]   # configs declarativas via pip
 
 [tool.setuptools.dynamic]
 version = { attr = "ventozy.__version__" }

@@ -60,12 +60,18 @@ Ideal como primer paso al reportar un issue.
    rutas exactas si tu equipo las necesita.
 4. Ajusta curvas en `profiles`.
 
-## Instalación "decente" para Linux Mint: paquete .deb 📦
+## Instalación "decente" para Linux Mint: paquete .deb 📦 (método recomendado)
 
 ```bash
 bash packaging/build-deb.sh
 sudo apt install ./ventozy_1.0.0_all.deb     # o doble clic en Mint
 ```
+
+> **Dos métodos, un mismo runtime de systemd.** El .deb pone las unidades en
+> `/lib/systemd/system/` y el icono SVG escalable (`hicolor/scalable`) — la
+> vía "paquete". `install.sh` (a continuación) es la vía "sin dpkg": mismas
+> unidades en `/etc/systemd/system/` y PNG 128×128. Elige UNA, no ambas:
+> los archivos quedan a cargo de dpkg en la .deb y de install.sh en la otra.
 
 El .deb (dpkg oficial) instala:
 - `/usr/bin/ventozy` — ejecutable real en el PATH (`ventozy`, `ventozy GUI`, doctor)
@@ -130,7 +136,7 @@ Véase `devices/asus_tuf_fa506nc.py` de ejemplo.
 | Tecla | Acción | Cómo llega |
 |---|---|---|
 | **Fn+F5** | ciclo del modo de ventilador: Silencio → Equilibrado → Turbo | daemon evdev (servicio `ventozy-hotkeys`) |
-| **Fn+↑/↓** | brillo de la retroiluminación del teclado | `KEY_KBDILLUMUP/DOWN` de `asus-nb-wmi` (cero risk de romper flechas normales) |
+| **Fn+↑/↓** | brillo de la retroiluminación del teclado | `KEY_KBDILLUMUP/DOWN` de `asus-nb-wmi` (sin riesgo de romper flechas normales) |
 
 - Instalado y activado por `install.sh` (servicio `ventozy-hotkeys`, 40 MB cap,
   se auto-levanta en el arranque).
@@ -146,6 +152,13 @@ FA506NC tiene RGB Single-Zone del firmware con modos estático/etc.
 Sin asusctl la GUI avisa: "instala asusctl". Estilo todo reversible.
 
 ## Paridad de funciones con G-Helper
+
+> **Nota honesta de hardware:** estas columnas indican que la función está
+> implementada y tiene pruebas de unidad en `tests/`. El único equipo con
+> validación real de fabrica (hardware real) es el **ASUS TUF Gaming A15
+> FA506NC** del autor de Ventozy. En otros modelos, las funciones dependen
+> de que tu kernel anime las rutas sysfs equivalentes — corre
+> `ventozy doctor` y reporta el resultado en un issue.
 
 | G-Helper (Windows) | Ventozy (Linux / Mint) | Funciona |
 |---|---|---|
@@ -167,11 +180,11 @@ Sin asusctl la GUI avisa: "instala asusctl". Estilo todo reversible.
   "Notifications" o "Power modules", o crear keyboard shortcuts en
   Config → Keyboard → Shortcut (comando `ventozy status`) si prefieres
   delegar en el DE en lugar del daemon evdev.
-- La política pkexec creada por install.sh pide la contraseña de admin
-  (con `auth_admin_keep`: se recuerda 5 min, como el UAC de Windows que
-  G-Helper solo muestra la primera vez). La política lleva los `annotate`
-  `exec.path`/`argv1` necesarios para que aplique a `pkexec python3
-  /opt/ventozy/run.py`.
+La política lleva el `annotate` `exec.path` apuntando al binario elevado
+`/opt/ventozy/ventozy-launch` (root, 755) — así `pkexec` aplica esta política
+concreta y **no** la genérica de `python3`. El wrapper toma `HOME` del
+`PKEXEC_UID` (tus curvas quedan en TU `~/.config/ventozy/`) y recibe
+`DISPLAY`/`XAUTHORITY` como argumentos, porque pkexec borra el entorno.
 - `ventozy-gui` corre la GUI como tu usuario (sin pkexec): ideal para
   mirar estado; si escribes curvas sin permisos, la GUI te dirá cómo
   elevar (`ventozy` sí eleva). pkexec pierde `HOME`/`DISPLAY`, por eso
@@ -184,7 +197,7 @@ Sin asusctl la GUI avisa: "instala asusctl". Estilo todo reversible.
 - **Notificaciones de escritorio** (`notify-send`): al cambiar de modo con
   Fn+F5 o la GUI aparece un toast "Ventiladores → Turbo"; ante una
   emergencia del watchdog sale `critical` (con sonido). Si `notify-send`
-  no existe, todo mono sigue funcionando igual.
+  no existe, el resto sigue funcionando igual (solo sin toasts).
 - **Icono en la bandeja** (panel de Cinnamon): `python3 run.py tray`
   → menú con los 3 modos, toggle de GPU dedicada y "Salir (restaura Auto)".
   Necesita `gir1.2-appindicator3-0.1` (Mint lo trae por defecto).

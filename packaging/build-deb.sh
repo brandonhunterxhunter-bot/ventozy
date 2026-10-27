@@ -40,19 +40,39 @@ find "$WORK/opt/ventozy" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null
 chmod -R a+rX "$WORK/opt/ventozy"
 
 # ---------- ejecutable ----------
+# Wrapper ELEVADO (root, 755): destino de la política polkit. pkexec
+# autoriza según exec.path exacto (no /usr/bin/env ni python3 genérico).
+# HOME sale de PKEXEC_UID; DISPLAY/XAUTHORITY pasan como args --venv-*.
+cat > "$WORK/opt/ventozy/ventozy-launch" <<'EOF'
+#!/bin/bash
+venv_display=""; venv_xauth=""; rest=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --venv-display) venv_display="$2"; shift 2 ;;
+        --venv-xauth)   venv_xauth="$2";   shift 2 ;;
+        *)              rest+=("$1");      shift ;;
+    esac
+done
+if [ -n "${PKEXEC_UID:-}" ]; then
+    export HOME="$(getent passwd "$PKEXEC_UID" | cut -d: -f6)"
+fi
+export DISPLAY="${venv_display:-${DISPLAY:-:0}}"
+export XAUTHORITY="${venv_xauth:-${XAUTHORITY:-$HOME/.Xauthority}}"
+exec /usr/bin/python3 /opt/ventozy/run.py "${rest[@]}"
+EOF
+chmod 755 "$WORK/opt/ventozy/ventozy-launch"
+
 cat > "$WORK/usr/bin/ventozy" <<'EOF'
 #!/bin/bash
 # como root ya (sudo/systemd): ejecuta directo
 if [ "$(id -u)" -eq 0 ]; then
     exec python3 /opt/ventozy/run.py "$@"
 fi
-# usuario normal: eleva con pkexec; conserva HOME (persistencia de curvas
-# en ~/.config/ventozy) y DISPLAY/XAUTHORITY (que Tk abra la ventana)
-exec pkexec env \
-    DISPLAY="${DISPLAY:-:0}" \
-    XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}" \
-    HOME="$HOME" \
-    python3 /opt/ventozy/run.py "$@"
+# usuario normal: eleva con pkexec → wrapper (polkit com.ventozy.modify)
+exec pkexec /opt/ventozy/ventozy-launch \
+    --venv-display "${DISPLAY:-:0}" \
+    --venv-xauth "${XAUTHORITY:-$HOME/.Xauthority}" \
+    "$@"
 EOF
 chmod 755 "$WORK/usr/bin/ventozy"
 
@@ -93,8 +113,7 @@ cat > "$WORK/usr/share/polkit-1/actions/com.ventozy.policy" <<'EOF'
  <action id="com.ventozy.modify">
   <description>Controlar ventiladores/GPU/teclado con Ventozy</description>
   <message>Ventozy necesita permiso para controlar el hardware</message>
-  <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/python3</annotate>
-  <annotate key="org.freedesktop.policykit.exec.argv1">/opt/ventozy/run.py</annotate>
+  <annotate key="org.freedesktop.policykit.exec.path">/opt/ventozy/ventozy-launch</annotate>
   <defaults>
    <allow_any>auth_admin_keep</allow_any>
    <allow_inactive>auth_admin_keep</allow_inactive>

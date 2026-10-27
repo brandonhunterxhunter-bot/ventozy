@@ -205,9 +205,11 @@ WantedBy=multi-user.target
     except OSError as e:
         print(f"❌ error instalando servicio: {e}")
         return 1
-    for c in ("systemctl daemon-reload", "systemctl enable --now ventozy"):
-        if os.system(c) != 0:
-            print("❌ falló:", c)
+    for c in (["systemctl", "daemon-reload"],
+              ["systemctl", "enable", "--now", "ventozy"]):
+        r = subprocess.run(c, capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"❌ falló: {' '.join(c)}\n   {r.stderr.strip()}")
             return 1
     print(f"✅ ventozy daemon instalado y activo al arranque ({dst}).")
     print("   Estado: systemctl status ventozy")
@@ -216,12 +218,13 @@ WantedBy=multi-user.target
 
 
 def uninstall_systemd() -> int:
-    os.system("systemctl disable --now ventozy")
+    subprocess.run(["systemctl", "disable", "--now", "ventozy"],
+                   capture_output=True, text=True)
     try:
         os.remove("/etc/systemd/system/ventozy.service")
     except OSError:
         pass
-    os.system("systemctl daemon-reload")
+    subprocess.run(["systemctl", "daemon-reload"], capture_output=True, text=True)
     print("✅ Servicio desinstalado.")
     return 0
 

@@ -48,7 +48,8 @@ command -v python3 && python3 -c "import gi" 2>/dev/null || \
 # ---------- 5. icono de menú + lanzadores ----------
 mkdir -p /usr/share/icons/hicolor/128x128/apps
 python3 "$DST/assets/make_icon.py" /usr/share/icons/hicolor/128x128/apps/ventozy-icon.png \
-    2>/dev/null || python3 "$SRC/assets/make_icon.py" /usr/share/icons/hicolor/128x128/apps/ventozy-icon.png
+    || python3 "$SRC/assets/make_icon.py" /usr/share/icons/hicolor/128x128/apps/ventozy-icon.png \
+    || true   # el icono es cosmético: no aborta la instalación
 gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 
 cat > /usr/share/applications/ventozy.desktop <<EOF
@@ -63,10 +64,32 @@ StartupNotify=true
 EOF
 
 # ---------- 6. ejecutables en PATH ----------
-# política pkexec: exec.path/argv1 hacen que ESTA política aplique a
-# 'pkexec python3 /opt/ventozy/run.py' (sin annotation, polkit usa la
-# política por defecto de python3). auth_admin_keep pide contraseña la
-# primera vez y la recuerda 5 min (como el UAC de Windows).
+# Wrapper ELEVADO (root, 755) al que apunta la política polkit.
+# pkexec autoriza según exec.path de la política: debe ser este binario,
+# no /usr/bin/env ni python3 genérico (regresión corregida).
+# - HOME sale del PKEXEC_UID (persistencia en ~/.config/ventozy del usuario)
+# - DISPLAY/XAUTHORITY llegan como argumentos --venv-* (pkexec borra el env)
+cat > "$DST/ventozy-launch" <<'EOF'
+#!/bin/bash
+venv_display=""; venv_xauth=""; rest=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --venv-display) venv_display="$2"; shift 2 ;;
+        --venv-xauth)   venv_xauth="$2";   shift 2 ;;
+        *)              rest+=("$1");      shift ;;
+    esac
+done
+if [ -n "${PKEXEC_UID:-}" ]; then
+    export HOME="$(getent passwd "$PKEXEC_UID" | cut -d: -f6)"
+fi
+export DISPLAY="${venv_display:-${DISPLAY:-:0}}"
+export XAUTHORITY="${venv_xauth:-${XAUTHORITY:-$HOME/.Xauthority}}"
+exec /usr/bin/python3 /opt/ventozy/run.py "${rest[@]}"
+EOF
+chmod 755 "$DST/ventozy-launch"
+
+# política pkexec que APLICA de verdad al wrapper (exec.path exacto).
+# auth_admin_keep: contraseña la primera vez, recordada 5 min (UAC).
 cat > /usr/share/polkit-1/actions/com.ventozy.policy <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
@@ -75,8 +98,7 @@ cat > /usr/share/polkit-1/actions/com.ventozy.policy <<'EOF'
  <action id="com.ventozy.modify">
   <description>Control de ventiladores/GPU/teclado de Ventozy</description>
   <message>Se necesita permiso para controlar el hardware</message>
-  <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/python3</annotate>
-  <annotate key="org.freedesktop.policykit.exec.argv1">/opt/ventozy/run.py</annotate>
+  <annotate key="org.freedesktop.policykit.exec.path">/opt/ventozy/ventozy-launch</annotate>
   <defaults>
    <allow_any>auth_admin_keep</allow_any>
    <allow_inactive>auth_admin_keep</allow_inactive>
@@ -85,19 +107,18 @@ cat > /usr/share/polkit-1/actions/com.ventozy.policy <<'EOF'
  </action>
 </policyconfig>
 EOF
-# `ventozy` → GUI con icono y botones (permisos via pkexec, como G-Helper).
-# pkexec pierde HOME/DISPLAY/XAUTHORITY: se pasan explícitamente para que
-# las curvas persistan en ~/.config/ventozy y Tk pueda abrir la ventana.
+# `ventozy` → GUI con icono y botones (permisos via pkexec → wrapper, como
+# G-Helper). El usuario pasa DISPLAY/XAUTHORITY como args del wrapper; el
+# wrapper (root) fija HOME del usuario desde PKEXEC_UID.
 cat > /usr/local/bin/ventozy <<EOF
 #!/bin/bash
 if [ "\$(id -u)" -eq 0 ]; then
     exec python3 $DST/run.py "\$@"
 fi
-exec pkexec env \\
-    DISPLAY="\${DISPLAY:-:0}" \\
-    XAUTHORITY="\${XAUTHORITY:-\$HOME/.Xauthority}" \\
-    HOME="\$HOME" \\
-    python3 $DST/run.py "\$@"
+exec pkexec $DST/ventozy-launch \\
+    --venv-display "\${DISPLAY:-:0}" \\
+    --venv-xauth "\${XAUTHORITY:-\$HOME/.Xauthority}" \\
+    "\$@"
 EOF
 chmod +x /usr/local/bin/ventozy
 # `ventozy-gui` → GUI como USUARIO normal, sin pkexec ni contraseña
