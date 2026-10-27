@@ -1,0 +1,34 @@
+#!/bin/sh
+# postinst del paquete ventozy
+set -e
+
+CODE_DIR=/opt/ventozy
+
+# 1. Módulos del kernel recomendados (al boot)
+modprobe k10temp 2>/dev/null || true
+modprobe asus-nb-wmi 2>/dev/null || true
+echo "k10temp"     > /etc/modules-load.d/ventozy.conf 2>/dev/null || true
+echo "asus-nb-wmi" >> /etc/modules-load.d/ventozy.conf 2>/dev/null || true
+
+# 2. Icono PNG 128 (generado del SVG si corresponde) y caché de iconos
+if [ -f /usr/share/icons/hicolor/scalable/apps/ventozy.svg ]; then
+    gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
+fi
+update-desktop-database -q 2>/dev/null || true
+
+# 3. Servicios systemd
+if command -v systemctl >/dev/null; then
+    systemctl daemon-reload || true
+    systemctl enable ventozy.service 2>/dev/null || true
+    systemctl restart ventozy.service 2>/dev/null || true
+    systemctl enable ventozy-hotkeys.service 2>/dev/null || true
+    systemctl restart ventozy-hotkeys.service 2>/dev/null || true
+fi
+
+echo "✅ Ventozy instalado:"
+echo "   App en el menú (GUI), comando 'ventozy' en terminal"
+echo "   Servicios: systemctl status ventozy (daemon seguro) y ventozy-hotkeys (Fn+F5, Fn+↑/↓)"
+echo "   Diagnóstico: ventozy doctor"
+echo "   Desinstalar: sudo apt remove ventozy   (revierte TODO)"
+
+exit 0

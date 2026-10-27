@@ -1,0 +1,34 @@
+﻿[Unit]
+Description=Ventozy — control seguro de ventiladores (arranque automático)
+After=multi-user.target
+
+[Service]
+Type=simple
+# Si el watchdog detecta un problema de seguridad sale con código 75;
+# systemd reintenta con 30 s de backoff. El kernel SIEMPRE recupera el
+# control automático en ese escenario (auto() antes de cada exit 75).
+Restart=always
+RestartSec=30
+RestartForceExitStatus=75
+SuccessExitStatus=75
+ExecStart=/usr/bin/env python3 /opt/ventozy/run.py daemon balanced
+WorkingDirectory=/opt/ventozy
+# ---- consumo mínimo ----
+Nice=15
+CPUSchedulingPolicy=idle     # solo usa CPU cuando el resto está libre
+MemoryMax=80M                # cap duro: si creciera, OOM-kill propio y restart
+OOMScoreAdjust=200           # preferir matarlo a matar al resto del sistema
+# ---- sandboxing (root escribe solo en /sys, nada más) ----
+ProtectHome=true
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+User=root
+
+[Install]
+WantedBy=multi-user.target

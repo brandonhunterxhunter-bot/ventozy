@@ -1,0 +1,27 @@
+﻿[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ventozy"
+description = "Control modular y seguro de ventiladores + GPU switch para portátiles Linux (estilo G-Helper)"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+requires-python = ">=3.8"
+dynamic = ["version"]
+keywords = ["fan", "fans", "laptop", "asus", "hwmon", "g-helper", "linux"]
+classifiers = [
+  "Environment :: X11 Applications",
+  "Intended Audience :: End Users/Desktop",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+]
+
+[project.scripts]
+ventozy = "ventozy.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ventozy*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ventozy.__version__" }

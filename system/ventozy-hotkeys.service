@@ -1,0 +1,21 @@
+﻿[Unit]
+Description=Ventozy hotkeys — Fn+F5 (modo ventilador) y Fn+↑/↓ (brillo teclado)
+After=multi-user.target
+
+[Service]
+Type=simple
+# accede a /dev/input (grab de teclado); el resto queda en sandbox
+Restart=always
+RestartSec=10
+ExecStart=/usr/bin/env python3 /opt/ventozy/run.py hotkeys
+WorkingDirectory=/opt/ventozy
+Nice=10
+CPUSchedulingPolicy=idle
+MemoryMax=40M
+# evdev necesita leer /dev/input: no sandboxar dispositivos
+DeviceAllow=char-input rwm
+PrivateTmp=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

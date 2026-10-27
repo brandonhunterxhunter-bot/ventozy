@@ -1,0 +1,34 @@
+﻿{
+  "match": ["_PLANTILLA_"],
+  "info": {
+    "model": "Tu modelo aquí",
+    "vendor": "Tu marca",
+    "notes": "Copia este archivo a configs/<marca>-<modelo>.json. detect() lo elegirá si 'match' aparece en /sys/class/dmi/id."
+  },
+  "_cómo": "match: substrings (case-insensitive) de product_name o board_name. fans/sensors: vacíos = autodetección universal.",
+  "min_pwm": 0,
+  "battery_path": "/sys/class/power_supply/BAT0/charge_control_end_threshold",
+  "sensor_chips": [],
+  "fans": [],
+  "sensors": [],
+  "profiles": [
+    {
+      "name": "quiet",
+      "label": "🔇  Silencioso",
+      "curve": [[50, 60], [65, 120], [75, 190], [85, 255]],
+      "min_pwm": 0
+    },
+    {
+      "name": "balanced",
+      "label": "⚖️  Equilibrado",
+      "curve": [[45, 80], [60, 130], [70, 190], [80, 240], [88, 255]],
+      "min_pwm": 0
+    },
+    {
+      "name": "performance",
+      "label": "🚀  Turbo",
+      "curve": [[40, 100], [55, 150], [65, 200], [75, 255]],
+      "min_pwm": 0
+    }
+  ]
+}

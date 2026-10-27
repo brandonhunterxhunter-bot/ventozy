@@ -1,0 +1,25 @@
+Package: ventozy
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3, python3-tk, polkitd
+Recommends: python3-evdev, libnotify-bin, gir1.2-appindicator3-0.1, systemd
+Suggests: asusctl
+Installed-Size: 512
+Maintainer: Ventozy Community <https://github.com/tu-usuario/ventozy>
+Homepage: https://github.com/tu-usuario/ventozy
+Description: Control modular y seguro de ventiladores, GPU y teclado para portátiles Linux
+ Ventozy propone el control del hardware de tu portátil con las mejores piezas
+ de la comunidad Linux:
+  - Modos de ventilador con curvas editables y watchdog de seguridad (95 °C)
+  - Botón de gráficos (integrada <-> dedicada) vía runtime PM reversible
+  - Límite de carga de batería (health charging 60/80/100 %)
+  - Retroiluminación de teclado: brillo + colores (vía asusctl si existe)
+  - Hotkeys: Fn+F5 (modo fan) y Fn+↑/↓ (brillo teclado)
+  - Perfiles de potencia Whisper/Standard/Boost (governor+EPP+boost)
+  - Auto-switch al desconectar el cargador
+  - Tray en el panel, notificaciones, curvas persistentes
+  - Compatible con el catálogo de configuraciones de nbfc-linux
+ La instalación activa servicios systemd con consumo mínimo (idle-CPU priority,
+ cap de memoria) y se puede desinstalar limpiamente con apt remove ventozy.

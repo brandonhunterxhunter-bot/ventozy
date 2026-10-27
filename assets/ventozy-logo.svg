@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ventozy — logo vectorial (ventilador de 6 aspas, degradado azul→cian) -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#20222b"/>
+      <stop offset="1" stop-color="#0c0d11"/>
+    </linearGradient>
+    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b7cd3"/>
+      <stop offset="1" stop-color="#20d3c4"/>
+    </linearGradient>
+    <radialGradient id="hub" cx="0.35" cy="0.35" r="0.9">
+      <stop offset="0" stop-color="#9ae6ff"/>
+      <stop offset="1" stop-color="#2b7cd3"/>
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+
+    <!-- un aspa, definida una vez y rotada 6× -->
+    <path id="prop-blade" fill="url(#blade)" fill-opacity="0.92"
+          d="M128 44
+             C 152 44, 170 62, 172 82
+             C 174 104, 164 118, 152 132
+             C 146 138, 144 144, 146 152
+             C 172 140, 200 122, 204 92
+             C 208 56, 184 34, 152 32
+             C 142 31, 134 34, 128 44 Z"/>
+  </defs>
+
+  <!-- tarjeta redondeada -->
+  <rect x="18" y="18" width="220" height="220" rx="44" fill="url(#bg)"/>
+  <rect x="19" y="19" width="218" height="218" rx="43" fill="none"
+        stroke="#3a3b42" stroke-width="2"/>
+
+  <!-- aro exterior -->
+  <circle cx="128" cy="128" r="98" fill="none" stroke="#20d3c4"
+          stroke-opacity="0.55" stroke-width="4"/>
+
+  <!-- 6 aspas -->
+  <g>
+    <use xlink:href="#prop-blade"/>
+    <use xlink:href="#prop-blade" transform="rotate(60,128,128)"/>
+    <use xlink:href="#prop-blade" transform="rotate(120,128,128)"/>
+    <use xlink:href="#prop-blade" transform="rotate(180,128,128)"/>
+    <use xlink:href="#prop-blade" transform="rotate(240,128,128)"/>
+    <use xlink:href="#prop-blade" transform="rotate(300,128,128)"/>
+  </g>
+
+  <!-- hub con brillo -->
+  <circle cx="128" cy="128" r="30" fill="url(#hub)"/>
+  <circle cx="118" cy="118" r="8" fill="#ffffff" opacity="0.65"
+          filter="url(#soft)"/>
+</svg>

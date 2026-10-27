@@ -1,0 +1,9 @@
+﻿{
+  "match": ["FA506NC", "FA506"],
+  "prefer": "code-adapter",
+  "info": {
+    "model": "ASUS TUF Gaming A15 FA506NC",
+    "vendor": "ASUSTeK",
+    "notes": "Usa el adaptador de código (devices/asus_tuf_fa506nc.py). Este JSON se mantiene como referencia documental del equipo."
+  }
+}
